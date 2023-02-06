@@ -1,1 +1,214 @@
-<h1>Hello, world!</h1>
+<!DOCTYPE html>
+<html>
+    <head>
+        <!-- meta has nothing to do with mapbox, this is boilerplate browser stuff... -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+        <!-- Import Mapbox GL JS -->
+        <script src='https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js'></script>
+        <link href='https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css' rel='stylesheet' />
+
+        <!-- Import Assmebly-->
+        <link href="https://api.mapbox.com/mapbox-assembly/v1.3.0/assembly.min.css" rel="stylesheet">
+        <script src="https://api.mapbox.com/mapbox-assembly/v1.3.0/assembly.js"></script>
+        
+        <!-- I'm convinced that this body style does absolutely nothing... -->
+        <!-- map style is important (editing the first three tags makes render nothing, and fourth works)... -->
+        <style>
+            body {margin: 0; padding: 1000;} 
+            #map {position: absolute; top: 0; bottom: 0; width: 100%;}
+        </style>
+    </head>
+
+
+
+    <body>
+        <!-- Load mapbox-gl-geocoder plugin. -->
+        <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+        <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+        <!-- Load directions plugin. -->
+        <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+        <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
+
+        <!-- This is a container for a map. -->
+        <div id='map'></div>
+
+        <!-- This is a container for the Isochrone controls. -->
+        <div class='absolute fl my24 mx24 py24 px24 bg-gray-faint round'>
+            <form id='params'>
+              <h4 class='txt-m txt-bold mb6'>Choose a travel mode:</h4>
+              <div class='mb12 mr12 toggle-group align-center'>
+                <label class='toggle-container'>
+                  <input name='profile' type='radio' value='walking'>
+                  <div class='toggle toggle--active-null toggle--null'>Walking</div>
+                </label>
+                <label class='toggle-container'>
+                  <input name='profile' type='radio' value='cycling'>
+                  <div class='toggle toggle--active-null toggle--null'>Cycling</div>
+                </label>
+                <label class='toggle-container'>
+                  <input name='profile' type='radio' value='driving' checked>
+                  <div class='toggle toggle--active-null toggle--null'>Driving</div>
+                </label>
+              </div>
+              <!-- Range for duration instead of buttons. Styling is weird though...
+              seems to only go to 2 (not 1), the label dissapears when brought to 60, and
+              the bar moves erratically. -->
+              <h4 class='txt-m txt-bold mb6'>Choose a maximum duration:</h4>
+              <div class='mb12 mr12 range align-center' id="rangeBar">
+                <label class='range'>
+                  <label id="mins"></label>  
+                  <input name='duration' id='slider' type='range' min="1" max="60" step="1" value="30">
+                </label>
+              </div>
+            </form>
+          </div>
+
+        <!-- This enables the map to be shown through the GL JS API. -->
+        <script>
+            var myGlobals = {}
+            mapboxgl.accessToken = 'pk.eyJ1IjoiY29ubm9yYnJvd24iLCJhIjoiY2xjczJzYXNuMGx6NDN2bjR2aXAzOWY0ZyJ9.7-sM-0G8TGnHv8VW8dpcTA';
+            const map = new mapboxgl.Map({
+                container: 'map', // the rule: use the same name as your empty div element's id.
+                projection: 'globe',
+                style: 'mapbox://styles/mapbox/navigation-night-v1', // sick style
+                center: [-71.13666,42.34906],
+                pitch: 0,
+                zoom: 6.67
+            });
+
+            // These are both for the isochrone API.    
+            // (Create vars to use in getIso() URL. If you want to change it later, don't make it const!)
+            const urlBase = 'https://api.mapbox.com/isochrone/v1/mapbox/';
+            var lon = -71.13666;
+            var lat = 42.34906;
+            var profile = 'driving'; // Set the default routing profile
+            var minutes = 30; // Set the default duration
+            // Create a function that sets up the Isochrone API query, then makes an fetch call
+            async function getIso() {
+                const query = await fetch(
+                `   ${urlBase}${profile}/${lon},${lat}?contours_minutes=${minutes}&polygons=true&access_token=${mapboxgl.accessToken}`,
+                    { method: 'GET' }
+                );
+                const data = await query.json();
+                map.getSource('iso').setData(data);
+            }
+
+            // enables directions GL JS
+            const directions = new MapboxDirections({
+                accessToken: mapboxgl.accessToken,
+            });
+
+            // add geocoding (aka Search) controller
+            map.addControl(
+                new MapboxGeocoder({
+                    accessToken: mapboxgl.accessToken,
+                    mapboxgl: mapboxgl
+                })
+            );
+
+            // add directions controller
+            map.addControl(directions,'bottom-left');
+            
+            // add waypoints, if desired
+            /* map.on('load', function() {
+                directions.setOrigin([-71.13666,42.34906]);
+                directions.addWaypoint(0, [-71.13385,42.35508]);
+                directions.addWaypoint(1, [-71.12131,42.30961]);
+                directions.addWaypoint(2, [-70.86721,42.53529]);
+                directions.addWaypoint(3, [-70.90727,41.59657])
+                directions.setDestination([-70.50874,44.23548]);
+            }); */
+            
+            // Marker can be global!
+            function startMarkerThing() {
+                    markerInternal = new mapboxgl.Marker({
+                    color: '#ffffff',
+                    draggable: true
+                })
+                    .setLngLat([-71.13666,42.34906])
+                    .addTo(map);
+
+                return markerInternal
+            }
+
+            // Set the label to the correct num
+            function filterBy(timerange) {
+                document.getElementById('mins').textContent = timerange + 1;
+            }
+
+            map.on('load', () => {
+                // When the map loads, add the source and layer
+                map.addSource('iso', {
+                    type: 'geojson',
+                    data: {
+                    type: 'FeatureCollection',
+                    features: []
+                    }
+                });
+
+                map.addLayer(
+                    {
+                    id: 'isoLayer',
+                    type: 'fill',
+                    // Use "iso" as the data source for this layer
+                    source: 'iso',
+                    layout: {},
+                    paint: {
+                        // The fill color for the layer is set to a light purple
+                        'fill-color': '#FB4F14',
+                        'fill-opacity': 0.4
+                    }
+                    },
+                    'poi-label'
+                );
+                
+                // Set initial label to 30 (index of 30 is 29)
+                filterBy(29);
+
+                // Make the API call
+                getIso();
+            });
+
+            /*
+            Since JavaScript is asynchronous, this seems dangerous...
+            Marker could appear before the map, and startMarkerThing references the map.
+            I suppose I should learn about mounting things. But this works for now.
+            */
+            marker = startMarkerThing();
+
+            // Target the "params" form in the HTML portion of your code
+            const params = document.getElementById('params');
+
+            // When a user changes the value of profile or duration by clicking a button, change the parameter's value and make the API query again
+            params.addEventListener('change', (event) => {
+            if (event.target.name === 'profile') {
+                profile = event.target.value;
+            } else if (event.target.name === 'duration') {
+                minutes = event.target.value;
+            }
+            getIso();
+            });
+
+            // When marker moves, update isochone API.
+            function onDragEnd() {
+                var lngLatCurr = marker.getLngLat();
+                lon = lngLatCurr.lng;
+                lat = lngLatCurr.lat;
+                getIso();
+                console.log('Marker moved!');
+            }
+
+            // Actually updates marker
+            marker.on('dragend', onDragEnd);
+
+            // Event listener for slider / range; when it moves, label updates (c/o filterBy())
+            document.getElementById('slider').addEventListener('input', (e) => {
+                const month = parseInt(e.target.value, 10);
+                filterBy(month);
+            });
+
+        </script>
+    </body>
+</html>
